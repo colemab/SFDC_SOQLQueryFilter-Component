@@ -1,0 +1,55 @@
+<apex:component controller="SOQLQueryFilter_Comp_Controller">
+
+	<apex:attribute name="FilterResultReturnObject" type="SOQLQueryFilterResult" assignTo="{!FilterResult}" description="This is the object that passes the WHERE string back." required="True"/>
+	<apex:attribute name="ObjectToFilter" type="SObject" assignTo="{!ObjectToFilter}" description="This is the object that will be described for filtering." required="True"/>
+
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>	 
+	<script src="http://cachedcommons.org/cache/jquery-blockui/2.3.3/javascripts/jquery-blockui-min.js"></script>
+	
+	<script type="text/javascript">
+		j$ = jQuery.noConflict();
+
+	    function BlockMe() {	        
+	        j$.blockUI();		        	         			
+	    }
+
+	    function UnBlockMe() {	        
+	        j$.unblockUI();		        	         			
+	    }		
+	    		
+	</script>
+	
+	<apex:outputPanel id="QueryFilterPanel">
+		<apex:actionRegion >		
+			<apex:repeat value="{!SOQLQueryFilterDataList}" var="QueryData">
+		
+	
+					<apex:selectList value="{!QueryData.FieldName}" size="1" id="FieldName">
+						<apex:selectOptions value="{!FieldsSelectOptionList}" />
+						<apex:actionSupport event="onchange"  rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+					</apex:selectList>
+					
+					&nbsp;
+					
+					<apex:selectList value="{!QueryData.Operator}" size="1" id="Operator" style="width: 125px;">
+						<apex:selectOptions value="{!QueryData.OperatorList}" />
+					</apex:selectList>
+					
+					&nbsp;
+								
+					<apex:inputText value="{!QueryData.Value}" /> 
+										
+					<br/><br/>
+												
+			</apex:repeat>
+		</apex:actionRegion>
+		
+		<br/>
+		
+	</apex:outputPanel>
+
+	<apex:commandButton value="Add" action="{!AddQueryFilterDataRow}" reRender="QueryFilterPanel" />
+	
+	<br/><br/>
+ 	 				
+</apex:component>

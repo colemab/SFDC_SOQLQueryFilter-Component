@@ -1,0 +1,9 @@
+<apex:page controller="testControllerExt" sidebar="false" >
+	
+	<apex:form >
+	
+		<c:SOQLQueryFilter FilterResultReturnObject="{!FilterResult}" ObjectToFilter="{!Object2Filter}" />
+	
+	</apex:form>
+		
+</apex:page>
