@@ -9,36 +9,7 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		} // end set
 	} // ObjectToFilter
 		
-	public SOQLQueryFilterResult FilterResult {
-		set;
-		get {
-			string SOQLWhereClause = ' WHERE ';
-			
-			// loop thru our wrapper objects to build our WHERE clause
-			for (SOQLQueryFilterData CurrentFilterData : SOQLQueryFilterDataList)
-			{					
-				
-				if (CurrentFilterData.SOQLClause.length() > 0) {
-					// Each wrapper class builds its own string, so we just assemble them here . . . 
-					SOQLWhereClause += CurrentFilterData.SOQLClause + ' AND ';
-				} // CurrentFilterData.SOQLClause != null
-				
-			} // loop thru SOQLQueryFilterDataList
-			
-			system.debug('SOQLWhereClause = ' + SOQLWhereClause);
-			
-			// remove any trailing and . . . 
-			SOQLWhereClause = SOQLWhereClause.removeEnd(' AND ');
-				
-			// since components can only pass data back via objects and not primitives
-			// put the string in a wrapper class instance so the object can send data back		
-			SOQLQueryFilterResult ReturnValue = new SOQLQueryFilterResult();
-			ReturnValue.WhereConditionString = SOQLWhereClause;
-			
-			return ReturnValue;
-			
-		} // end get
-	} // SOQLQueryFilterResult
+	public SOQLQueryFilterResult FilterResult {set; get;}
 
 	// ---------------------------------------
 	// internal vars
@@ -69,9 +40,21 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		// to prevent from having to make describe calls to the schema again.
 		SOQLQueryFilterData Row = new SOQLQueryFilterData(this);
 		SOQLQueryFilterDataList.add(Row);
-						
+		
+		BuildQueryString();				
 	} // AddQueryFilterDataRow
 
+	public void RemoveQueryFilterDataRow() {
+		
+		if (SOQLQueryFilterDataList.size() > 1) {
+			// remove the last row
+			SOQLQueryFilterDataList.remove(SOQLQueryFilterDataList.size()-1);
+		} // SOQLQueryFilterDataList.size > 1
+		
+		BuildQueryString();
+					
+	} // RemoveQueryFilterDataRow
+	
 	private void PopulateFieldsList() {
 		// This function will look at the SObject that was passed in
 		// and create a selectoption list of those fields for the GUI
@@ -112,6 +95,34 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		FieldsSelectOptionList.add(0,new SelectOption('','--None--'));
 									
 	} // PopulateFieldsList
+	
+	public void BuildQueryString() {
+			string SOQLWhereClause = ' WHERE ';
+			
+			// loop thru our wrapper objects to build our WHERE clause
+			for (SOQLQueryFilterData CurrentFilterData : SOQLQueryFilterDataList)
+			{					
+				
+				if (CurrentFilterData.SOQLClause.length() > 0) {
+					// Each wrapper class builds its own string, so we just assemble them here . . . 
+					SOQLWhereClause += CurrentFilterData.SOQLClause + ' AND ';
+				} // CurrentFilterData.SOQLClause != null
+				
+			} // loop thru SOQLQueryFilterDataList
+			
+			// remove any trailing and . . . 
+			SOQLWhereClause = SOQLWhereClause.removeEnd(' AND ');
+			
+			system.debug('SOQLWhereClause = ' + SOQLWhereClause);
+							
+			// since components can only pass data back via objects and not primitives
+			// put the string in a wrapper class instance so the object can send data back
+											
+			if (FilterResult != null) { // avoid nullpointer exception during init
+				FilterResult.WhereConditionString = SOQLWhereClause;
+			} // FilterResult != null
+					
+	} // BuildQueryString
 	
 	static testMethod Void TestSOQLQueryFilter_Comp_Controller()
 	{

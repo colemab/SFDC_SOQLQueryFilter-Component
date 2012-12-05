@@ -3,8 +3,8 @@
 	<apex:attribute name="FilterResultReturnObject" type="SOQLQueryFilterResult" assignTo="{!FilterResult}" description="This is the object that passes the WHERE string back." required="True"/>
 	<apex:attribute name="ObjectToFilter" type="SObject" assignTo="{!ObjectToFilter}" description="This is the object that will be described for filtering." required="True"/>
 
-	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>	 
-	<script src="http://cachedcommons.org/cache/jquery-blockui/2.3.3/javascripts/jquery-blockui-min.js"></script>
+	<apex:includeScript value="{!$Resource.jquery}"/>
+	<apex:includeScript value="{!$Resource.jqueryblockUI}"/>
 	
 	<script type="text/javascript">
 		j$ = jQuery.noConflict();
@@ -26,18 +26,21 @@
 	
 					<apex:selectList value="{!QueryData.FieldName}" size="1" id="FieldName">
 						<apex:selectOptions value="{!FieldsSelectOptionList}" />
-						<apex:actionSupport event="onchange"  rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
 					</apex:selectList>
 					
 					&nbsp;
 					
 					<apex:selectList value="{!QueryData.Operator}" size="1" id="Operator" style="width: 125px;">
 						<apex:selectOptions value="{!QueryData.OperatorList}" />
+						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
 					</apex:selectList>
 					
 					&nbsp;
 								
-					<apex:inputText value="{!QueryData.Value}" /> 
+					<apex:inputText value="{!QueryData.Value}">
+						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+					</apex:inputText> 
 										
 					<br/><br/>
 												
@@ -49,6 +52,7 @@
 	</apex:outputPanel>
 
 	<apex:commandButton value="Add" action="{!AddQueryFilterDataRow}" reRender="QueryFilterPanel" />
+	<apex:commandButton value="Remove" action="{!RemoveQueryFilterDataRow}" reRender="QueryFilterPanel" />
 	
 	<br/><br/>
  	 				

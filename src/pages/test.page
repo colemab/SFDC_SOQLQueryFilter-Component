@@ -1,9 +1,13 @@
 <apex:page controller="testControllerExt" sidebar="false" >
 	
-	<apex:form >
+	<apex:form id="MainForm">
 	
 		<c:SOQLQueryFilter FilterResultReturnObject="{!FilterResult}" ObjectToFilter="{!Object2Filter}" />
-	
-	</apex:form>
+		
+		<hr/>
+		The FilterResult was: {!FilterResult.WhereConditionString}<br/>
+		
+		<apex:commandButton value="Display / Update Query" rerender="MainForm"/>
+	</apex:form>				
 		
 </apex:page>
