@@ -97,7 +97,7 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 	} // PopulateFieldsList
 	
 	public void BuildQueryString() {
-			string SOQLWhereClause = ' WHERE ';
+			string SOQLWhereClause = ' ';
 			
 			// loop thru our wrapper objects to build our WHERE clause
 			for (SOQLQueryFilterData CurrentFilterData : SOQLQueryFilterDataList)
@@ -127,10 +127,12 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 	static testMethod Void TestSOQLQueryFilter_Comp_Controller()
 	{
 		// This object will hold the query string
-		SOQLQueryFilterResult FilterResult = new SOQLQueryFilterResult();
+		SOQLQueryFilterResult FilterResultObject = new SOQLQueryFilterResult();
+		FilterResultObject.WhereConditionString = '';
 		
 		// instance of the component controller 
 		SOQLQueryFilter_Comp_Controller MyController = new SOQLQueryFilter_Comp_Controller();
+		MyController.FilterResult = FilterResultObject;
 		
 		// filter on the account object, once this is set the fields will get populated
 		MyController.ObjectToFilter = new Account(); 
