@@ -22,18 +22,38 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		// vars for holding data from GUI
 		public List<SOQLQueryFilterData> SOQLQueryFilterDataList {get; set;}
 		
-		
+		// vars for advanced filter logic
+		public boolean AdvancedFilterEnabled {get; set;} 
+		public string AdvancedFilterCondition {get; set;}
+		public string AdvancedFilterCondtionErrorMessage {get; set;}
+		public boolean AdvancedFilterCondtionHasError {get; set;}
 	// ---------------------------------------
 			
 	public SOQLQueryFilter_Comp_Controller() {
 		
 		FieldsSelectOptionList = new List<SelectOption>();
 		SOQLQueryFilterDataList = new List<SOQLQueryFilterData>();
-						
+		
+		AdvancedFilterEnabled = false;
+		AdvancedFilterCondition = '';	
+		AdvancedFilterCondtionErrorMessage = '';
+		AdvancedFilterCondtionHasError = false;
+					
 		// Make sure we have at least one option on the GUI . . . 		 		
 		AddQueryFilterDataRow();
 		
 	} // SOQLQueryFilter_Comp_Controller Constructor
+	
+	public void ToggleAdvancedFilter() {
+								
+		AdvancedFilterEnabled = !AdvancedFilterEnabled;
+				
+		if (AdvancedFilterEnabled == false) {
+			AdvancedFilterCondition = '';
+			BuildQueryString();
+		} // AdvancedFilterEnabled == false
+						
+	} // ToggleAdvancedFilter
 	
 	public void AddQueryFilterDataRow() {
 		// this is a reference to the parent controller and is being passed in
@@ -95,25 +115,154 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		FieldsSelectOptionList.add(0,new SelectOption('','--None--'));
 									
 	} // PopulateFieldsList
+
+
+	public void ValidateAdvancedFilterString() {
+		
+		// assume we will have an error . . .
+		AdvancedFilterCondtionHasError = true;
+				
+		if (AdvancedFilterEnabled == true) {
+			// if the user didn't specify any condition then use the default 
+			if (AdvancedFilterCondition == '') {
+				AdvancedFilterCondtionErrorMessage = 'Filter logic is required when enabled.';
+				return;				
+			} // AdvancedFilterCondition == ''
+			
+			// someone forgot to close a parentheses or forgot to open one
+			if (AdvancedFilterCondition.countMatches('(') != AdvancedFilterCondition.countMatches(')')) {
+				AdvancedFilterCondtionErrorMessage = 'All parentheses must be closed and opened.';
+				return;
+			} // check for ( and ) count being equal
+			
+			// tokenize the AdvancedFilterCondition via spaces
+			list<string> AdvancedFilterConditionTokens = AdvancedFilterCondition.split(' ');
+			
+			boolean LastTokenWasNumeric = true;
+			
+			for (integer x=0; x<AdvancedFilterConditionTokens.size(); x++) {
+				string CurrentToken = AdvancedFilterConditionTokens.get(x);
+				
+				// if the user doesn't put a space between parentheses,
+				// we need to remove parentheses to get a truley numeric value
+				string CurrentTokenNumeric = CurrentToken.remove('(');
+				CurrentTokenNumeric = CurrentTokenNumeric.remove(')');
+				
+				system.debug('CurrentNumericToken: ' + CurrentTokenNumeric);
+				system.debug('AdvancedFilterConditionTokens.size() = ' + AdvancedFilterConditionTokens.size());
+				system.debug('x =' + x);
+				
+				if (CurrentTokenNumeric.isNumeric()) {
+
+					// filter logic is made up of field numbers and union statements AND, OR
+					// if two field numbers are back to back, the logic is invalid					
+					if (LastTokenWasNumeric == true && x!=0) {
+						AdvancedFilterCondtionErrorMessage = 'The filter logic is invalid.';
+						return;												
+					} // LastTokenWasNumeric == true
+					
+					// the tokens will start at 1 but the clause will start a 0
+					integer CurrentClause = integer.valueof(CurrentTokenNumeric)-1;
+					
+					// the user tried to add a number but the array isn't that large					
+					if (SOQLQueryFilterDataList.size() < CurrentClause) {
+						AdvancedFilterCondtionErrorMessage = 'The filter logic references an undefined filter: ' + CurrentTokenNumeric;
+						return;
+					} // SOQLQueryFilterDataList.size > CurrentClause
+					
+					LastTokenWasNumeric = true;																
+				} else {
+					// filter logic is made up of field numbers and union statements AND, OR
+					// if two union statements are back to back, the logic is invalid
+					if (LastTokenWasNumeric == false) {
+						AdvancedFilterCondtionErrorMessage = 'The filter logic is invalid.';
+						return;						
+					} // LastTokenWasNumeric == false
+					
+					// Check for invalid placement of NOT 
+					if (CurrentTokenNumeric.toUpperCase() == 'NOT' && x!=0) {
+						AdvancedFilterCondtionErrorMessage = 'The NOT operator is only valid at the start filter logic.';
+						return;													
+					} // check for NOT but not in first clause
+					
+					// AND/OR/NOT are the only valid operators
+					if (CurrentTokenNumeric.toUpperCase() != 'OR' && CurrentTokenNumeric.toUpperCase() != 'AND' && CurrentTokenNumeric.toUpperCase() != 'NOT') {
+						AdvancedFilterCondtionErrorMessage = 'Check the spelling in your filter logic.';
+						return;																			
+					} // check for AND/OR/NOT 
+
+					// the filter logic cannot end with an operator					
+					if (x+1==AdvancedFilterConditionTokens.size()) {
+						AdvancedFilterCondtionErrorMessage = 'The filter logic is invalid.';
+						return;												
+					} // x==AdvancedFilterConditionTokens.size()
+					
+					LastTokenWasNumeric = false; 
+				} // CurrentToken.isNumeric()
+				
+			} //CurrentToken: AdvancedFilterConditionTokens
+						
+		} // AdvancedFilterEnabled == true
+		
+		// clear any previous error messages on each run
+		AdvancedFilterCondtionErrorMessage = '';		
+		// this is used by the build string function to avoid building an invalid string
+		AdvancedFilterCondtionHasError = false;
+		
+	} //ValidateAdvancedFilterString 
 	
 	public void BuildQueryString() {
 			string SOQLWhereClause = ' ';
 			
-			// loop thru our wrapper objects to build our WHERE clause
-			for (SOQLQueryFilterData CurrentFilterData : SOQLQueryFilterDataList)
-			{					
+			// if no advanced query, everything is AND
+			if (AdvancedFilterEnabled == false) {
+				// loop thru our wrapper objects to build our WHERE clause
+				for (SOQLQueryFilterData CurrentFilterData : SOQLQueryFilterDataList)
+				{					
+					
+					if (CurrentFilterData.SOQLClause.length() > 0) {
+						// Each wrapper class builds its own string, so we just assemble them here . . . 
+						SOQLWhereClause += CurrentFilterData.SOQLClause + ' AND ';
+					} // CurrentFilterData.SOQLClause != null
+					
+				} // loop thru SOQLQueryFilterDataList
 				
-				if (CurrentFilterData.SOQLClause.length() > 0) {
-					// Each wrapper class builds its own string, so we just assemble them here . . . 
-					SOQLWhereClause += CurrentFilterData.SOQLClause + ' AND ';
-				} // CurrentFilterData.SOQLClause != null
+				// remove any trailing and . . . 
+				SOQLWhereClause = SOQLWhereClause.removeEnd(' AND ');
+			} else {
+								 
+				// this call will set AdvancedFilterCondtionHasError 
+				ValidateAdvancedFilterString();
 				
-			} // loop thru SOQLQueryFilterDataList
-			
-			// remove any trailing and . . . 
-			SOQLWhereClause = SOQLWhereClause.removeEnd(' AND ');
-			
-			system.debug('SOQLWhereClause = ' + SOQLWhereClause);
+				if (AdvancedFilterCondtionHasError == false) {
+								
+					// tokenize the AdvancedFilterCondition via spaces
+					list<string> AdvancedFilterConditionTokens = AdvancedFilterCondition.split(' ');
+					
+					for (integer x=0; x<AdvancedFilterConditionTokens.size(); x++) {
+						string CurrentToken = AdvancedFilterConditionTokens.get(x);
+						
+						// if the user doesn't put a space between parentheses,
+						// we need to remove parentheses to get a truley numeric value
+						string CurrentTokenNumeric = CurrentToken.remove('(');
+						CurrentTokenNumeric = CurrentTokenNumeric.remove(')');
+						
+						if (CurrentTokenNumeric.isNumeric()) {
+							// the tokens will start at 1 but the clause will start a 0
+							integer CurrentClause = integer.valueof(CurrentTokenNumeric)-1;
+							
+							// Replace is used here so that any parentheses are kept
+							CurrentToken = CurrentToken.replace(CurrentTokenNumeric,SOQLQueryFilterDataList.get(CurrentClause).SOQLClause); 
+													
+							AdvancedFilterConditionTokens.set(x,CurrentToken);
+						} // CurrentToken.isNumeric()
+					} //CurrentToken: AdvancedFilterConditionTokens
+					
+					// re-assemble our tokens
+					SOQLWhereClause = string.join(AdvancedFilterConditionTokens, ' ');
+				} // AdvancedFilterCondtionHasError == false
+				 				
+			} // if (AdvancedFilterEnabled == false) 						
 							
 			// since components can only pass data back via objects and not primitives
 			// put the string in a wrapper class instance so the object can send data back
@@ -163,7 +312,66 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 				system.debug('Condition is: ' + MyController.FilterResult.WhereConditionString);						
 			} // loop thru Operators
 		} // loop thru fields
-						
+		
+		// calls to GUI methods
+		MyController.AddQueryFilterDataRow();
+		MyController.RemoveQueryFilterDataRow();		
+		MyController.ToggleAdvancedFilter();
+		
+		// code coverage for advanced filter error conditions
+		
+			// Filter logic is required when enabled.
+			MyController.AdvancedFilterCondition  = '';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+
+			// All parentheses must be closed and opened.
+			MyController.AdvancedFilterCondition  = '(';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+
+			// if two field numbers are back to back, the logic is invalid			
+			MyController.AdvancedFilterCondition  = '1 2 3';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+
+			// The filter logic references an undefined filter			
+			MyController.AdvancedFilterCondition  = '10000';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+
+			// if two union statements are back to back, the logic is invalid 
+			MyController.AdvancedFilterCondition  = '1 AND AND';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+
+			// The NOT operator is only valid at the start filter logic
+			MyController.AdvancedFilterCondition  = '1 NOT';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+
+			// unknown operator
+			MyController.AdvancedFilterCondition  = 'BOB';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+
+			// the filter logic cannot end with an operator
+			MyController.AdvancedFilterCondition  = '1 AND';
+			MyController.ValidateAdvancedFilterString();
+			system.assert(MyController.AdvancedFilterCondtionHasError == true);
+			
+			// test a clean build of advanced query string
+			MyController.AdvancedFilterEnabled = true;
+			MyController.AdvancedFilterCondtionHasError = false;
+			MyController.AdvancedFilterCondition  = '1 AND 1';
+			MyController.BuildQueryString();
+			system.debug('AdvancedFilterCondtionErrorMessage = ' + MyController.AdvancedFilterCondtionErrorMessage);
+			system.assert(MyController.AdvancedFilterCondtionHasError == false);
+									
+			// test flipping the indicator back						
+			MyController.AdvancedFilterEnabled = true;
+			MyController.ToggleAdvancedFilter();
+			
 		system.debug('>>>> END TEST METHOD <<<<<<');
 		
 	} // TestSOQLQueryFilter_Comp_Controller
@@ -192,8 +400,10 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 					// Pull the current field from the map
 					CurrentField = ParentController.FieldsMap.get(value);
 								
-					// Use a describe call to get the type back (an enum value is returned)
-					CurrentFieldType = CurrentField.getDescribe().getType();
+					if (CurrentField != null) {								
+						// Use a describe call to get the type back (an enum value is returned)
+						CurrentFieldType = CurrentField.getDescribe().getType();
+					} // CurrentField != null
 					
 					// Set the Operator List to valid options for the current type
 					PopulateOperatorList();

@@ -16,7 +16,9 @@
 	    function UnBlockMe() {	        
 	        j$.unblockUI();		        	         			
 	    }		
-	    		
+	    
+	    // this overrides the salesforce function and prevents any field from having inital focus
+	    function setFocusOnLoad() {} 		
 	</script>
 	
 	<apex:outputPanel id="QueryFilterPanel">
@@ -26,34 +28,51 @@
 	
 					<apex:selectList value="{!QueryData.FieldName}" size="1" id="FieldName">
 						<apex:selectOptions value="{!FieldsSelectOptionList}" />
-						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
 					</apex:selectList>
 					
 					&nbsp;
 					
 					<apex:selectList value="{!QueryData.Operator}" size="1" id="Operator" style="width: 125px;">
 						<apex:selectOptions value="{!QueryData.OperatorList}" />
-						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
 					</apex:selectList>
 					
 					&nbsp;
 								
 					<apex:inputText value="{!QueryData.Value}">
-						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />						 
 					</apex:inputText> 
-										
-					<br/><br/>
+			
+					<br/>
 												
 			</apex:repeat>
 		</apex:actionRegion>
 		
 		<br/>
-		
-	</apex:outputPanel>
 
-	<apex:commandButton value="Add" action="{!AddQueryFilterDataRow}" reRender="QueryFilterPanel" />
-	<apex:commandButton value="Remove" action="{!RemoveQueryFilterDataRow}" reRender="QueryFilterPanel" />
+		<apex:commandButton value="Add Row" action="{!AddQueryFilterDataRow}" reRender="QueryFilterPanel" onClick="BlockMe();" onComplete="UnBlockMe();"/>
+		<apex:commandButton value="Remove Row" action="{!RemoveQueryFilterDataRow}" reRender="QueryFilterPanel" onClick="BlockMe();" onComplete="UnBlockMe();"/>
+		
+		<br/> <br/>		
+	</apex:outputPanel>
 	
-	<br/><br/>
- 	 				
+	<apex:outputPanel id="FilterLogic">
+		<apex:commandLink action="{!ToggleAdvancedFilter}" immediate="True" value="Add Filter Logic..." reRender="FilterLogic" rendered="{!NOT(AdvancedFilterEnabled)}" onClick="BlockMe();" onComplete="UnBlockMe();"/>
+		<apex:commandLink action="{!ToggleAdvancedFilter}" immediate="True" value="Clear Filter Logic" reRender="FilterLogic" rendered="{!AdvancedFilterEnabled}" onClick="BlockMe();" onComplete="UnBlockMe();"/>
+		<br/>
+		<apex:outputPanel id="AdvancedFilterCondition" rendered="{!AdvancedFilterEnabled}">
+			Filter Logic:<br/>
+			<apex:inputText value="{!AdvancedFilterCondition}" size="73">
+				<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />				
+			</apex:inputText>
+			<br/>
+			<apex:outputPanel id="AdvancedFilterConditionError" style="color: #D74C3B;" rendered="{!AdvancedFilterCondtionHasError}">
+				<strong>Error:&nbsp;</strong>
+				<apex:outputText value="{!AdvancedFilterCondtionErrorMessage}" />
+			</apex:outputPanel>
+		</apex:outputPanel>
+		<br/>
+	</apex:outputPanel>
+	 				
 </apex:component>
