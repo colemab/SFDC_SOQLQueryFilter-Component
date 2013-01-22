@@ -4,6 +4,10 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 	public SObject ObjectToFilter {get;
 		set {
 			ObjectToFilter = value;
+			
+			// This is used communicate with lookup window
+			this.CurrentObjectName = EncodingUtil.urlEncode(ObjectToFilter.getSObjectType().getDescribe().getName(), 'UTF-8');
+			
 			// now that we know what we are going to filter, we can provide a list of fields . . .
 			PopulateFieldsList();
 		} // end set
@@ -27,6 +31,9 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		public string AdvancedFilterCondition {get; set;}
 		public string AdvancedFilterCondtionErrorMessage {get; set;}
 		public boolean AdvancedFilterCondtionHasError {get; set;}
+		
+		// vars for custom lookup window - should be UTF-8 encoded to pass in the URL
+		public string CurrentObjectName {get; set;}		
 	// ---------------------------------------
 			
 	public SOQLQueryFilter_Comp_Controller() {
@@ -147,11 +154,7 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 				// we need to remove parentheses to get a truley numeric value
 				string CurrentTokenNumeric = CurrentToken.remove('(');
 				CurrentTokenNumeric = CurrentTokenNumeric.remove(')');
-				
-				system.debug('CurrentNumericToken: ' + CurrentTokenNumeric);
-				system.debug('AdvancedFilterConditionTokens.size() = ' + AdvancedFilterConditionTokens.size());
-				system.debug('x =' + x);
-				
+								
 				if (CurrentTokenNumeric.isNumeric()) {
 
 					// filter logic is made up of field numbers and union statements AND, OR
@@ -284,7 +287,7 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		MyController.FilterResult = FilterResultObject;
 		
 		// filter on the account object, once this is set the fields will get populated
-		MyController.ObjectToFilter = new Account(); 
+		MyController.ObjectToFilter = new Account();
 		
 		// A new filter option was automatically created, get it to change the settings
 		SOQLQueryFilterData FilterOption = MyController.SOQLQueryFilterDataList.get(0);
@@ -294,11 +297,14 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		// start this at 1 instead of zero so we don't select --none-- which is first and is invalid 
 		for (integer x=1; x<TotalFields; x++ ) {
 			// set the current field
-			FilterOption.FieldName = MyController.FieldsSelectOptionList.get(1).getValue();
-			
+			FilterOption.FieldName = MyController.FieldsSelectOptionList.get(x).getValue();			
 			system.debug('Current Field: ' + FilterOption.FieldName);
-			
-			FilterOption.Value = 'Test';
+									
+			if (Schema.Displaytype.PickList == FilterOption.CurrentFieldType) {
+				FilterOption.Value = 'A,B,C,D';
+			} else {			
+				FilterOption.Value = 'Test';
+			}
 			
 			integer TotalOperators = FilterOption.OperatorList.size();
 						
@@ -307,11 +313,13 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 				FilterOption.Operator = FilterOption.OperatorList.get(y).getValue();
 				
 				system.debug('Current Operator: ' + FilterOption.Operator);
-				
+								
 				// get the condition string				
 				system.debug('Condition is: ' + MyController.FilterResult.WhereConditionString);						
 			} // loop thru Operators
 		} // loop thru fields
+		
+		MyController.BuildQueryString();
 		
 		// calls to GUI methods
 		MyController.AddQueryFilterDataRow();
@@ -411,23 +419,36 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			} // set method for Field Name
 		} // Field Name
 		
+		// the field name is UTF8 encoded for use with the lookupwindow
+		public string FieldNameUTF8 {
+			get {
+				return EncodingUtil.urlEncode(FieldName,'UTF-8');
+			} // get
+		} // FieldNameUTF8
+		
 		public string Operator {get; set;}
 		 
-		public string Value  {get; 
-			set {
-				// escape our string to prevent SOQL injection
-				this.Value = string.escapeSingleQuotes(value);
-			} // set for value
+		public string Value  {
+			get {
+				if (value == null) value='';
+				return value;
+			} 
+			set;
 		} // Value String 
 		
-		// each instance of the wrapper class builds its SOQL here
-		public string SOQLClause {
-			get {
+		// var for displaying CustomLookupWindow
+		public boolean RenderLookupIcon {get;set;}
+				
+		// InputValue is passed in so that BuildMultipleSOQLSOQLClause can use this method too
+		private string BuildSingleSingleClause(string InputValue) {
 				string ReturnValue = '';
+								
+				// escape quotes here to prevent SOQL injection while hiding them from the GUI
+				string EscapedValue = string.escapeSingleQuotes(InputValue);
 				
 				// If a user added a row but didn't give us a value, don't try to build a string
 				// Also, if a user left the field defaulted to --None-- then don't try to build a string
-				if (FieldName != null && Operator != null && value != null) {
+				if (FieldName != null && Operator != null && EscapedValue != null) {
 				
 					// This is a special operator that puts text before the field
 					if (Operator == 'DOES NOT CONTAIN') {
@@ -435,9 +456,9 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 						// when you have mutiple conditions
 						ReturnValue += '( NOT ';
 					} // DOES NOT CONTAIN
-				
-					ReturnValue += FieldName + ' ';
 					
+					ReturnValue += FieldName + ' ';
+									
 					// the like based operators need to be transformed into LIKE
 					if (Operator == 'CONTAINS' || Operator == 'DOES NOT CONTAIN' || Operator == 'STARTS WITH') {
 						ReturnValue += 'LIKE ';
@@ -445,7 +466,7 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 						// all the other operators can be directly plugged in
 						ReturnValue += Operator + ' ';
 					} // check for operator being like based
-				
+									
 					// now add in the value - adding quotes to those that require it
 					if (
 							CurrentFieldType == Schema.Displaytype.Email ||					
@@ -460,16 +481,16 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 					{
 						// the like based operators need to have the % added in
 						if (Operator == 'CONTAINS' || Operator == 'DOES NOT CONTAIN') {
-							ReturnValue += '\'%' + value + '%\' ';
+							ReturnValue += '\'%' + EscapedValue + '%\' ';
 						} else if (Operator == 'STARTS WITH') {
-							ReturnValue += '\'' + value + '%\' ';
+							ReturnValue += '\'' + EscapedValue + '%\' ';
 						} else {
 							// just add the quotes in
-							ReturnValue += '\'' + value + '\' ';											
-						}					
-					} else {
+							ReturnValue += '\'' + EscapedValue + '\' ';											
+						} // Operator == 'CONTAINS' || Operator == 'DOES NOT CONTAIN'
+					} else {												
 						// for those that don't require a quote, just plug in the value
-						ReturnValue += value + ' ';
+						ReturnValue += EscapedValue + ' ';
 					} // check to see if quotes are required
 
 					if (Operator == 'DOES NOT CONTAIN') {
@@ -481,6 +502,100 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 				} // check for null values
 				
 				return ReturnValue;
+			
+		} // BuildSingleSOQLSOQLClause
+				
+		private string BuildMultipleSOQLSOQLClause() {
+			string ReturnValue = '';
+			
+			List<string> ParsedValuesList = new List<string>();
+			
+			if (value.containsAny('"')) {
+				// since values could contain double quotes and commas, we need to parse twice
+				// once for the double quote and again for the comma
+				List<string> QuoteParsedValuesList = value.split('"');
+				
+				for (string S:QuoteParsedValuesList) {
+					
+					if (S.startsWith(', ') || S.endsWith(', ')) {
+						S = S.removeStart(', ');
+						S = S.removeEnd(', ');
+					}	
+					
+					// escape the string to prevent SOQL injection
+					S =  string.escapeSingleQuotes(S);
+										
+					ParsedValuesList.add(S);
+					
+				} // for (string S:QuoteParsedValuesList)
+			} else {
+				// this is a normal comma delimited parse
+				ParsedValuesList = value.split(', ');
+			} // if value.containsAny('"')
+									
+			if (Operator == '=' || Operator == 'IN' || Operator == '!=' || Operator == 'NOT IN') {
+
+				if (Operator == '=' || Operator == 'IN') {
+					ReturnValue = FieldName + ' IN (';
+				}else if (Operator == '!=' || Operator == 'NOT IN') {
+					ReturnValue = FieldName + ' NOT IN (';
+				} // Operator == 'equals' || Operator == 'in'
+			
+				// add delimiters for the SOQL query
+				for (string CurrentValue: ParsedValuesList) {			
+					ReturnValue += '\'' + CurrentValue + '\',';					
+				} // for (string CurrentValue: ParsedValuesList) 
+				
+				// remove any trailing commas
+				if (ReturnValue.endsWith(',')) ReturnValue = ReturnValue.removeEnd(',');
+			
+				// add closing Parenthesis
+				ReturnValue += ')'; 
+			
+			} else { 	// for contains, does not contain, and starts with
+
+				// default to OR for Contains and starts with
+				string CurrentCondition = ' OR ';
+
+				// change to AND as needed (currently only for does not contain)
+				if (Operator == 'DOES NOT CONTAIN') {
+					CurrentCondition = ' AND ';
+				} // if (Operator == 'DOES NOT CONTAIN') {
+
+				for (string CurrentValue: ParsedValuesList) {
+					ReturnValue += BuildSingleSingleClause(CurrentValue) + CurrentCondition;					
+				} // for (string CurrentValue: ParsedValuesList) {
+
+				// remove any trailing condition
+				if (ReturnValue.endsWith(CurrentCondition)) ReturnValue = ReturnValue.removeEnd(CurrentCondition);
+
+				// surround with Parentheses just in case this is parter of a larger expression					
+				ReturnValue = ' (' + ReturnValue + ' )'; 
+				
+			} // Operator == '=' || Operator == 'IN' || Operator == '!=' || Operator == 'NOT IN'
+						
+			return ReturnValue; 
+		} // BuildMultipleSOQLSOQLClause
+		
+		
+		// each instance of the wrapper class builds its SOQL here
+		public string SOQLClause {
+			get {
+				
+					if (CurrentFieldType == Schema.Displaytype.PickList) {
+						
+						// when mutiple values are provided by the lookup window, they will be comma delimited
+						// if an individual value contains a comma, it will be wrapped in double quotes
+						if (value.containsAny(',')) {
+							return BuildMultipleSOQLSOQLClause();
+						} else {						
+							return BuildSingleSingleClause(value);
+						}
+							
+					} else {
+						// mutiple items aren't supported for this type yet, so just build a single clause
+						return BuildSingleSingleClause(value);
+					} // CurrentFieldType == Schema.Displaytype.PickList								
 			} // get 
 		} // SOQL Clause
 		
@@ -494,10 +609,26 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			
 			OperatorList = new List<SelectOption>();
 			
+			RenderLookupIcon = false;
+			
 			// fill the list with the default values ....
 			PopulateOperatorList();
 			
 		} // constructor
+		
+		private void UpdateRenderLookupIcon() {
+			// for now, this only display's for picklist and Name Fields
+			if (
+				(CurrentFieldType == Schema.Displaytype.PickList) || 
+					(CurrentFieldType == Schema.Displaytype.String) && (CurrentField.getDescribe().getName() == 'Name') 
+				) 
+			{
+					
+				RenderLookupIcon = true;
+			} else {
+				RenderLookupIcon = false;
+			}
+		} // UpdateRenderLookupIcon
 		
 		private void PopulateOperatorList() {
 			
@@ -548,14 +679,17 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 				//Now add EXCLUDES and INCLDUES for MultiPickLists
 				if (CurrentFieldType == Schema.Displaytype.MultiPickList) 
 				{
-					// Note that EXCLUDES and INCLUDES require a comma delimited list wrapped in Parentheses
+					// Note that EXCLUDES and INCLUDES require a comma delimited list wrapped in Parentheses (much like in / not in)
 					OperatorList.add(new SelectOption('EXCLUDES','excludes'));
 					OperatorList.add(new SelectOption('INCLUDES','includes'));				
 				} // Add EXCLUDES & INCLUDES Operators
 			
 			*/
+			
+			// display the lookup icon as needed
+			UpdateRenderLookupIcon();
 						
-		} // RePopulateOperatorList
+		} // PopulateOperatorList
 		
 	} // SOQLQueryFilterData
 

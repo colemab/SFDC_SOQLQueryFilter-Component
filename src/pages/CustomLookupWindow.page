@@ -1,0 +1,124 @@
+<apex:page controller="CustomLookupWindowController" showHeader="false" sidebar="false">
+	
+	<STYLE type="text/css">
+		.pageTitleIcon {
+		    background-image: url("/img/sprites/master.png");
+		    background-position: 0 -1202px;
+		    height: 32px;
+		    width: 32px;
+		}
+		
+		body {
+			font-family: Arial,Helvetica,sans-serif;
+			background: url("/img/alohaSkin/lookup_bg.png") repeat-x scroll 0 0 #FFFFFF;
+			margin: 0 10px;			
+		}
+		
+		.bPageTitle h1 {
+		    color: #333435;
+		    font-size: 1.8em;
+		    margin: 8px 0 4px;
+		}
+		
+		.bPageTitle h1, .bPageTitle h2 {
+		    display: block;
+		}
+		
+		.ValueLabel {
+		    color: #4A4A56;
+		    font-size: 0.9em;
+		    margin: 0 5px 0 0;
+		}		
+				
+	</STYLE>
+
+	<script type="text/javascript">
+	    function setValueOnParentWindowAndClose(ValueToSet) {
+	    	// update the input on the caller
+	    	window.opener.document.getElementById('{!InputDOMName}').value = ValueToSet; 
+	    	// fire the on change event in our input so the caller knows it was updated
+	    	window.opener.document.getElementById('{!InputDOMName}').onchange();
+	    	self.close();
+	    } 		
+	</script>
+
+	<body onBlur='javascript:window.close();'> 		
+		<div class="bPageTitle">
+			<img class="pageTitleIcon" title="" alt="" src="/s.gif" />
+			<h1>Lookup</h1>
+		</div>
+		
+		<apex:outputPanel id="TextSearchResultsOP" rendered="{!RenderTextSearch}" >
+			<apex:form >
+								
+				<div class="pbBody">
+					<strong>Search</strong>&nbsp;&nbsp; 
+					<apex:inputText value="{!TextSearchInput}" id="TextSearchInput" />
+					&nbsp;&nbsp;
+					<apex:CommandButton value="Go!" action="{!TextSearch}" />
+				
+					<br/>
+					
+				</div>
+				
+				<p style="padding-left: 30px;">
+					<h2>You can use "*" as a wildcard next to other characters to improve your search results.</h2>
+				</p>
+				
+				<br/><br/><br/>
+								
+				<apex:PageBlock id="TextSearchResultsPB" >				
+					
+					<apex:pageBlockTable value="{!TextOptionsList}" var="T" >
+							<apex:column value="{!T}" onclick="setValueOnParentWindowAndClose('{!JSENCODE(T)}');">				
+								<apex:facet name="header">Name</apex:facet>									
+							</apex:column>					
+					</apex:pageBlockTable>
+					
+				</apex:PageBlock>
+				
+			</apex:form>		
+		</apex:outputPanel>
+				
+		<apex:outputPanel id="ListSearchResultsOP" rendered="{!RenderListSearch}">
+		
+			<div class="pbBody">
+				<h2>Select the picklist values to add below.</h2>
+			</div>
+
+			<apex:form >	
+							
+				<apex:outputPanel id="ListSearchResultsOP" >
+					
+					<center><apex:CommandButton value="Insert Selected" action="{!BuildSelectedString}" oncomplete="setValueOnParentWindowAndClose('{!JSENCODE(SelectedString)}');" /></center>
+					
+					<apex:PageBlock id="ListSearchResultsPB" >				
+					
+						<apex:pageBlockTable value="{!ListModeOptionsList}" var="L">
+	
+							<apex:column style="width: 1%;">				
+								<apex:facet name="header">
+									<apex:inputCheckbox value="{!SelectAllList}">
+										<apex:actionSupport event="onclick" action="{!SetCurrentSelectedListWrapperSelected}" rerender="ListSearchResultsPB" immediate="true"/>
+									</apex:inputCheckbox>
+								</apex:facet>	
+								<apex:inputCheckbox value="{!L.Selected}"/>
+							</apex:column>
+	
+							<apex:column styleclass="ValueLabel">
+								<apex:facet name="header">Value</apex:facet>
+								{!L.Value}
+							</apex:column>
+	
+						</apex:pageBlockTable>
+						
+					</apex:PageBlock>										
+
+					<center><apex:CommandButton value="Insert Selected" action="{!BuildSelectedString}" oncomplete="setValueOnParentWindowAndClose('{!JSENCODE(SelectedString)}');" /></center>
+														
+				</apex:outputPanel>
+															
+			</apex:form>		
+		</apex:outputPanel>
+	</body>
+</apex:page>
