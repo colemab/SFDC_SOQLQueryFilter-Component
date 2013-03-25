@@ -4,46 +4,98 @@
 	<apex:attribute name="ObjectToFilter" type="SObject" assignTo="{!ObjectToFilter}" description="This is the object that will be described for filtering." required="True"/>
 
 	<apex:includeScript value="{!$Resource.jquery}"/>
-	<apex:includeScript value="{!$Resource.jqueryblockUI}"/>
+	<apex:includeScript value="{!$Resource.jqueryblockUI}"/>	
+	
+	<apex:includeScript value="{!URLFOR($Resource.jqueryUI, 'jqueryui.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.jqueryUI, 'start-jquery-ui.css')}"/>
+		
+	<STYLE type="text/css">
+		.lookupIcon {
+		    background-image: url("/img/func_icons/util/lookup20.gif");
+		    background-position: left top;
+		    height: 20px;
+		    width: 20px;
+    		padding-bottom: 1px;
+    		vertical-align: middle;		    
+		}
+		
+		.lookupIconOn {
+    		padding-bottom: 1px;
+    		vertical-align: middle;
+		}	
+		
+		.lineItem {
+			margin: 2px 2px 2px 2px;
+		}
+	</style>
 	
 	<script type="text/javascript">
 		j$ = jQuery.noConflict();
 
+		// this is used to block the page while an ajax request is pending
 	    function BlockMe() {	        
 	        j$.blockUI();		        	         			
 	    }
 
+		// this unblocks the page when an ajax request completes
 	    function UnBlockMe() {	        
 	        j$.unblockUI();		        	         			
 	    }		
 	    
 	    // this overrides the salesforce function and prevents any field from having inital focus
-	    function setFocusOnLoad() {} 		
+	    function setFocusOnLoad() {} 	
+	    
+	    // this is used to open the custom lookup window in a pop-up window instead of a new tab
+	    function openLookupWindow(URL) {
+	    	LookupWindow = window.open(URL,'lookup','height=500,width=680,toolbar=no,status=no,directories=no,menubar=no,resizable=yes,scrollable=no',true);
+	    	LookupWindow.focus();
+	    }
+	     	    	      												
+		// this function resolves an issue with the way that Jquery and
+		// salesforce work with the : in the ID
+		function esc(myid) {
+			return '#' + myid.replace(/(:|\.)/g,'\\\\$1');
+		}	     	    	      	
 	</script>
-	
+		
 	<apex:outputPanel id="QueryFilterPanel">
 		<apex:actionRegion >		
 			<apex:repeat value="{!SOQLQueryFilterDataList}" var="QueryData">
 		
 	
-					<apex:selectList value="{!QueryData.FieldName}" size="1" id="FieldName">
+					<apex:selectList value="{!QueryData.FieldName}" size="1" id="FieldName" styleClass="lineItem">
 						<apex:selectOptions value="{!FieldsSelectOptionList}" />
 						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
 					</apex:selectList>
 					
 					&nbsp;
 					
-					<apex:selectList value="{!QueryData.Operator}" size="1" id="Operator" style="width: 125px;">
+					<apex:selectList value="{!QueryData.Operator}" size="1" id="Operator" style="width: 125px;" styleClass="lineItem">
 						<apex:selectOptions value="{!QueryData.OperatorList}" />
 						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
 					</apex:selectList>
 					
 					&nbsp;
 								
-					<apex:inputText value="{!QueryData.Value}">
+					<apex:inputText id="InputValue" value="{!QueryData.Value}" styleClass="lineItem">
 						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />						 
 					</apex:inputText> 
 			
+					<apex:outputPanel id="CustomLookupWindow" rendered="{!QueryData.RenderLookupIcon}" styleClass="lineItem">
+						&nbsp;
+
+						<img title="Lookup (New Window)" onclick="openLookupWindow('apex/CustomLookupWindow?object={!CurrentObjectName}&field={!QueryData.FieldNameUTF8}&input={!URLENCODE($Component.InputValue)}')" onmouseover="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onblur="this.className = 'lookupIcon';" class="lookupIcon" alt="Lookup (New Window)" src="/s.gif" />
+					
+					</apex:outputPanel>
+					
+					<apex:outputPanel id="DatePickerWindow" rendered="{!QueryData.RenderDatePickerIcon}" styleClass="lineItem">
+						<script>																	
+							 j$(function() {				
+							 	j$(esc('{!$Component.InputValue}')).datepicker();
+							 });							 
+						</script>
+					</apex:outputPanel>
+				
 					<br/>
 												
 			</apex:repeat>
@@ -63,7 +115,7 @@
 		<br/>
 		<apex:outputPanel id="AdvancedFilterCondition" rendered="{!AdvancedFilterEnabled}">
 			Filter Logic:<br/>
-			<apex:inputText value="{!AdvancedFilterCondition}" size="73">
+			<apex:inputText value="{!AdvancedFilterCondition}" size="74">
 				<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />				
 			</apex:inputText>
 			<br/>

@@ -7,7 +7,7 @@
 		<hr/>
 		The FilterResult was: {!FilterResult.WhereConditionString}<br/>
 		
-		<apex:commandButton value="Display / Update Query" rerender="MainForm"/>
+		<apex:commandButton value="Display / Update Query" immediate="True" rerender="MainForm"/>
 	</apex:form>				
 		
 </apex:page>

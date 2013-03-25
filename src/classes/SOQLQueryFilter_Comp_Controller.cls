@@ -214,6 +214,16 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		
 	} //ValidateAdvancedFilterString 
 	
+	public void PopulateFieldList() {
+		
+		FilterResult.FieldsList = new List<String>();
+		
+		for (SOQLQueryFilterData CurrentFilterData : SOQLQueryFilterDataList) {
+			FilterResult.FieldsList.add(CurrentFilterData.FieldName);
+		} // loop thru wrapper objects
+		
+	} // PopulateFieldList
+	
 	public void BuildQueryString() {
 			string SOQLWhereClause = ' ';
 			
@@ -225,7 +235,7 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 					
 					if (CurrentFilterData.SOQLClause.length() > 0) {
 						// Each wrapper class builds its own string, so we just assemble them here . . . 
-						SOQLWhereClause += CurrentFilterData.SOQLClause + ' AND ';
+						SOQLWhereClause += CurrentFilterData.SOQLClause + ' AND ';						
 					} // CurrentFilterData.SOQLClause != null
 					
 				} // loop thru SOQLQueryFilterDataList
@@ -272,6 +282,7 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 											
 			if (FilterResult != null) { // avoid nullpointer exception during init
 				FilterResult.WhereConditionString = SOQLWhereClause;
+				PopulateFieldList();
 			} // FilterResult != null
 					
 	} // BuildQueryString
@@ -302,10 +313,12 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 									
 			if (Schema.Displaytype.PickList == FilterOption.CurrentFieldType) {
 				FilterOption.Value = 'A,B,C,D';
+			} else if (Schema.Displaytype.Date == FilterOption.CurrentFieldType) {
+				FilterOption.Value = '1/1/2013';
 			} else {			
 				FilterOption.Value = 'Test';
 			}
-			
+						
 			integer TotalOperators = FilterOption.OperatorList.size();
 						
 			for (integer y=0; y<TotalOperators; y++) {
@@ -320,7 +333,28 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		} // loop thru fields
 		
 		MyController.BuildQueryString();
+
+		// increase code coverage by getting the UTF 8 name
+		system.debug('UTF8 Name = ' + FilterOption.FieldNameUTF8);
 		
+		
+		// increase code coverage by building differnt mutiple SOQL queries
+			FilterOption.Value = '"A","B","C","D"';
+			FilterOption.RenderLookupIcon  = true;
+			MyController.BuildQueryString();
+			
+			FilterOption.Operator = 'NOT IN';
+			FilterOption.Value = 'A,B,C,D';
+			MyController.BuildQueryString();
+	
+			FilterOption.Operator = 'IN';
+			FilterOption.Value = 'A,B,C,D';
+			MyController.BuildQueryString();
+			
+			FilterOption.Operator = 'DOES NOT CONTAIN';
+			FilterOption.Value = '"A","B","C","D"';
+			MyController.BuildQueryString();
+			
 		// calls to GUI methods
 		MyController.AddQueryFilterDataRow();
 		MyController.RemoveQueryFilterDataRow();		
@@ -436,8 +470,13 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			set;
 		} // Value String 
 		
-		// var for displaying CustomLookupWindow
+		// var for displaying CustomLookupWindow on fields that can use it
 		public boolean RenderLookupIcon {get;set;}
+		// var for displaying date picker icon on date fields
+		public boolean RenderDatePickerIcon {get;set;}
+		
+		// Future Development: var for displaying date/time picker on date/time fields
+		public boolean RenderDateTimePickerIcon {get;set;}
 				
 		// InputValue is passed in so that BuildMultipleSOQLSOQLClause can use this method too
 		private string BuildSingleSingleClause(string InputValue) {
@@ -504,16 +543,18 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 				return ReturnValue;
 			
 		} // BuildSingleSOQLSOQLClause
-				
-		private string BuildMultipleSOQLSOQLClause() {
+		
+		// the input string is passed in to allow the value to be different from
+		// the value on the row / data wrapper instance (i.e. reformat dates in the background)		
+		private string BuildMultipleSOQLSOQLClause(string InputValue) {
 			string ReturnValue = '';
 			
 			List<string> ParsedValuesList = new List<string>();
 			
-			if (value.containsAny('"')) {
+			if (InputValue.containsAny('"')) {
 				// since values could contain double quotes and commas, we need to parse twice
 				// once for the double quote and again for the comma
-				List<string> QuoteParsedValuesList = value.split('"');
+				List<string> QuoteParsedValuesList = InputValue.split('"');
 				
 				for (string S:QuoteParsedValuesList) {
 					
@@ -530,8 +571,8 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 				} // for (string S:QuoteParsedValuesList)
 			} else {
 				// this is a normal comma delimited parse
-				ParsedValuesList = value.split(', ');
-			} // if value.containsAny('"')
+				ParsedValuesList = InputValue.split(', ');
+			} // if InputValue.containsAny('"')
 									
 			if (Operator == '=' || Operator == 'IN' || Operator == '!=' || Operator == 'NOT IN') {
 
@@ -582,20 +623,33 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 		public string SOQLClause {
 			get {
 				
-					if (CurrentFieldType == Schema.Displaytype.PickList) {
-						
-						// when mutiple values are provided by the lookup window, they will be comma delimited
-						// if an individual value contains a comma, it will be wrapped in double quotes
-						if (value.containsAny(',')) {
-							return BuildMultipleSOQLSOQLClause();
-						} else {						
-							return BuildSingleSingleClause(value);
-						}
+				string FormatedValue = value;
+				
+				if (!String.isEmpty(value)) {
+					try {
+						if (CurrentFieldType == Schema.Displaytype.Date) {
+							date InputDate = date.parse(value);
+							// change the format for the query to standard YYYY-MM-DD format
+							FormatedValue = String.valueOf(InputDate);
+						} else if (CurrentFieldType == Schema.Displaytype.DateTime) {
+							datetime InputDateTime = datetime.parse(value);
+							// change the format to the standard YYYY-MM-DDTHH.mm.ss.000Z format
+							FormatedValue = InputDateTime.formatGMT('yyyy-MM-dd') + 'T' + InputDateTime.formatGMT('HH:mm:ss.SSS') + 'Z';
+						} // check for values that need to be reformatted
+					} catch (exception e) {
+						FormatedValue = value;
+					}					
+				} // check for blank value
+										
+				// if the lookup icon was rendered AND the value contains a comma then process as mutiple values
+				// when mutiple values are provided by the lookup window, they will be comma delimited
+				// if an individual value contains a comma, it will be wrapped in double quotes
+				if (RenderLookupIcon == true && value.containsAny(',')) {
+					return BuildMultipleSOQLSOQLClause(FormatedValue);
+				} else {						
+					return BuildSingleSingleClause(FormatedValue);
+				}
 							
-					} else {
-						// mutiple items aren't supported for this type yet, so just build a single clause
-						return BuildSingleSingleClause(value);
-					} // CurrentFieldType == Schema.Displaytype.PickList								
 			} // get 
 		} // SOQL Clause
 		
@@ -610,6 +664,8 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			OperatorList = new List<SelectOption>();
 			
 			RenderLookupIcon = false;
+			RenderDatePickerIcon = false;
+			RenderDateTimePickerIcon = false;
 			
 			// fill the list with the default values ....
 			PopulateOperatorList();
@@ -630,6 +686,29 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			}
 		} // UpdateRenderLookupIcon
 		
+		private void UpdateRenderDatePickerIcon() {
+			// Only display this for date fields
+			if (CurrentFieldType == Schema.Displaytype.Date) 				
+			{					
+				RenderDatePickerIcon = true;
+			} else {
+				RenderDatePickerIcon = false;
+			}
+			
+		} // UpdateRenderDatePickerIcon
+
+		// Future Development: Toggle javascript / icon for date / time picker
+		private void UpdateRenderDateTimePickerIcon() {
+			// Only display this for date/time fields
+			if (CurrentFieldType == Schema.Displaytype.DateTime) 				
+			{					
+				RenderDateTimePickerIcon = true;
+			} else {
+				RenderDateTimePickerIcon = false;
+			}
+			
+		} // UpdateRenderDateTimePickerIcon
+				
 		private void PopulateOperatorList() {
 			
 			// reset the list each time to prevent duplicates			
@@ -688,7 +767,13 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			
 			// display the lookup icon as needed
 			UpdateRenderLookupIcon();
-						
+			
+			// attach the date picker as needed
+			UpdateRenderDatePickerIcon();		
+			
+			// attach the date/time picker as needed
+			UpdateRenderDateTimePickerIcon();
+				
 		} // PopulateOperatorList
 		
 	} // SOQLQueryFilterData
