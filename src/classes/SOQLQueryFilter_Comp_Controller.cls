@@ -470,6 +470,15 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			set;
 		} // Value String 
 		
+		// vars for use when time fields are used in the GUI
+		public string Hour {get; set;}
+		public string Minute {get; set;}
+		public string AMPM {get; set;}
+		
+		public List<SelectOption> HourList {get; set;}
+		public List<SelectOption> MinuteList {get; set;}
+		public List<SelectOption> AMPMList {get; set;}
+		
 		// var for displaying CustomLookupWindow on fields that can use it
 		public boolean RenderLookupIcon {get;set;}
 		// var for displaying date picker icon on date fields
@@ -632,9 +641,15 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 							// change the format for the query to standard YYYY-MM-DD format
 							FormatedValue = String.valueOf(InputDate);
 						} else if (CurrentFieldType == Schema.Displaytype.DateTime) {
-							datetime InputDateTime = datetime.parse(value);
+							
+							string TempDateTime = value + ' ' + Hour + ':' + Minute + ' ' + AMPM;							
+							system.debug('>>>> TempDateTime = ' + TempDateTime);
+							
+							datetime InputDateTime = datetime.parse(TempDateTime);
+							
 							// change the format to the standard YYYY-MM-DDTHH.mm.ss.000Z format
 							FormatedValue = InputDateTime.formatGMT('yyyy-MM-dd') + 'T' + InputDateTime.formatGMT('HH:mm:ss.SSS') + 'Z';
+							
 						} // check for values that need to be reformatted
 					} catch (exception e) {
 						FormatedValue = value;
@@ -662,6 +677,10 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			this.ParentController = ParentController;
 			
 			OperatorList = new List<SelectOption>();
+			
+			HourList = new List<SelectOption>();
+			MinuteList = new List<SelectOption>();
+			AMPMList = new List<SelectOption>();
 			
 			RenderLookupIcon = false;
 			RenderDatePickerIcon = false;
@@ -702,12 +721,58 @@ public with sharing class SOQLQueryFilter_Comp_Controller {
 			// Only display this for date/time fields
 			if (CurrentFieldType == Schema.Displaytype.DateTime) 				
 			{					
-				RenderDateTimePickerIcon = true;
+				RenderDateTimePickerIcon = RenderDatePickerIcon = true;
+				PopulateTimesLists();
 			} else {
-				RenderDateTimePickerIcon = false;
-			}
-			
+				RenderDateTimePickerIcon = RenderDatePickerIcon = false;
+			}			
 		} // UpdateRenderDateTimePickerIcon
+		
+		private void PopulateTimesLists() {
+
+			PopulateHoursList();
+			PopulateMinutesList();
+			PopulateAMPMList();
+
+		} // PopulateTimesLists
+		
+		private void PopulateHoursList() {
+			
+			HourList.clear();
+			
+			for (integer x = 1; x <= 12; x++) {				
+			
+				HourList.add(new SelectOption(String.ValueOf(x), String.ValueOf(x)));
+			
+			} // loop to 12
+												
+		} // PopulateHoursList
+		
+		private void PopulateMinutesList() {
+			
+			MinuteList.clear();
+			
+			for (integer x = 0; x < 60; x++) {	
+				
+				// zero pad any single digits to be 2 digits
+				string CurrentMinute = String.ValueOf(x);
+				if (CurrentMinute.length() == 1) CurrentMinute = '0' + CurrentMinute;
+				
+				MinuteList.add(new SelectOption(CurrentMinute, CurrentMinute));
+				
+			} // loop to 59
+			
+		} // PopulateMinutesList
+		
+		private void PopulateAMPMList() {
+			
+			AMPMList.clear();
+			
+			AMPMList.add(new SelectOption('AM', 'AM'));
+			
+			AMPMList.add(new SelectOption('PM', 'PM'));
+			
+		} // PopulateAMPMList
 				
 		private void PopulateOperatorList() {
 			

@@ -8,7 +8,7 @@
 	
 	<apex:includeScript value="{!URLFOR($Resource.jqueryUI, 'jqueryui.js')}"/>
 	<apex:stylesheet value="{!URLFOR($Resource.jqueryUI, 'start-jquery-ui.css')}"/>
-		
+					
 	<STYLE type="text/css">
 		.lookupIcon {
 		    background-image: url("/img/func_icons/util/lookup20.gif");
@@ -77,8 +77,9 @@
 					
 					&nbsp;
 								
-					<apex:inputText id="InputValue" value="{!QueryData.Value}" styleClass="lineItem">
-						<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />						 
+					<apex:inputText id="InputValue" value="{!QueryData.Value}" styleClass="lineItem">												
+							<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						<!--  -->						 
 					</apex:inputText> 
 			
 					<apex:outputPanel id="CustomLookupWindow" rendered="{!QueryData.RenderLookupIcon}" styleClass="lineItem">
@@ -91,9 +92,34 @@
 					<apex:outputPanel id="DatePickerWindow" rendered="{!QueryData.RenderDatePickerIcon}" styleClass="lineItem">
 						<script>																	
 							 j$(function() {				
-							 	j$(esc('{!$Component.InputValue}')).datepicker();
+							 	j$(esc('{!$Component.InputValue}')).datepicker({});
 							 });							 
 						</script>
+					</apex:outputPanel>
+
+					<apex:outputPanel id="DateTimePickerWindow" rendered="{!QueryData.RenderDateTimePickerIcon}" styleClass="lineItem">
+
+						<apex:selectList value="{!QueryData.Hour}" size="1" id="Hour" style="width: 47px;" styleClass="lineItem">
+							<apex:selectOptions value="{!QueryData.HourList}" />
+							<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						</apex:selectList>
+						
+						&nbsp;
+
+						<apex:selectList value="{!QueryData.Minute}" size="1" id="Minute" style="width: 47px;" styleClass="lineItem">
+							<apex:selectOptions value="{!QueryData.MinuteList}" />
+							<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						</apex:selectList>
+						
+						&nbsp;
+
+						<apex:selectList value="{!QueryData.AMPM}" size="1" id="AMPM" style="width: 47px;" styleClass="lineItem">
+							<apex:selectOptions value="{!QueryData.AMPMList}" />
+							<apex:actionSupport event="onchange" action="{!BuildQueryString}" rerender="QueryFilterPanel,FilterLogic" onsubmit="BlockMe();" onComplete="UnBlockMe();" />
+						</apex:selectList>
+						
+						&nbsp;
+						
 					</apex:outputPanel>
 				
 					<br/>
